@@ -7,3 +7,5 @@ VisionMethodRecord/x64/
 .vcxproj
 .filters
 /.vs
+*.vcxproj
+*.filters
