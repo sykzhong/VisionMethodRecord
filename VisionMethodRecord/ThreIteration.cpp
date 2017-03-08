@@ -25,6 +25,7 @@ void ThreIteration(Mat const &image)
 	{
 		threshold(imageTemp, imageFore, Zavr, maxThValue, THRESH_TRUNC);
 		imageBack = imageTemp - imageFore;
+		//求取前景后景的平均灰度
 		Zmin = mean(imageFore, imageFore)[0];
 		Zmax = mean(imageBack, imageBack)[0];
 		thTemp = (Zmin + Zmax) / 2;
