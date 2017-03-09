@@ -4,9 +4,9 @@
 #define HSVHIST
 int main()
 {
-	string srcpath = "4.bmp";
-	string backpath = "1.bmp";
 #ifdef RGBHIST
+	string srcpath = "1.bmp";
+	string backpath = "2.bmp";
 	Hist src, back;
 	src.getImage(srcpath);
 	back.getImage(backpath);
@@ -27,12 +27,21 @@ int main()
 	//src.ThreIter();
 	src.showImage();
 	//tmp.showImage();
-#else
-	HSVHist src;
-	src.readImage(srcpath);
-	src.getHist();
-	src.drawHist();
-#endif
 	waitKey(0);
 	return 0;
+#else
+	string srcpath = "2.bmp";
+	string backpath = "1.bmp";
+	HSVHist src, back;
+	if (!src.readImage(srcpath) || !back.readImage(backpath))
+		return 0;
+
+	src.Init();
+	back.Init();
+
+	src.removeSeg(back);
+	src.showImage();
+	waitKey(0);
+	return 0;
+#endif
 }
