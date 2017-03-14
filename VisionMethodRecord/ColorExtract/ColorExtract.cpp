@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "Hist.h"
 #include "HSVHist.h"
+#include "ProImage.h"
 #define HSVHIST
 int main()
 {
@@ -30,18 +31,21 @@ int main()
 	waitKey(0);
 	return 0;
 #else
-	string srcpath = "2.bmp";
+	string srcpath = "4.bmp";
 	string backpath = "1.bmp";
-	HSVHist src, back;
-	if (!src.readImage(srcpath) || !back.readImage(backpath))
+	ProImage src, back;
+	if (!src.getImage(srcpath) || !back.getImage(backpath))
 		return 0;
 
 	src.Init();
 	back.Init();
-
 	src.removeSeg(back);
 	src.showImage();
+
+	src.preproImage();
+	src.getContour();
 	waitKey(0);
+	
 	return 0;
 #endif
 }

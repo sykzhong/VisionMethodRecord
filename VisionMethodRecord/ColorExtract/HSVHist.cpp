@@ -3,7 +3,7 @@
 HSVHist::HSVHist()
 {
 	histsize[0] = 8;		//H通道bin数
-	histsize[1] = 32;		//S通道
+	histsize[1] = 40;		//S通道
 	histsize[2] = 8;		//V通道
 
 	hrange[0] = 0;			//神tmbug，不如此中规中矩地设为180会出错
@@ -21,7 +21,12 @@ HSVHist::HSVHist()
 	hist_img = Mat(hist_h, hist_w, CV_8UC3, Scalar::all(0));
 }
 
-int HSVHist::readImage(string path)
+HSVHist::~HSVHist()
+{
+
+}
+
+int HSVHist::getImage(string path)
 {
 	srcimage = imread(path, 1);
 	if (!srcimage.data)
@@ -35,7 +40,7 @@ void HSVHist::Init()
 {
 	medianBlur(srcimage, srcimage, 3);
 	getHist();
-	//drawHist();
+	drawHist();
 }
 
 void HSVHist::getHist()
@@ -66,7 +71,7 @@ void HSVHist::drawHist()
 			//printf("i:%d j:%d binval:%.0f\n", i, j, binval);
 			
 			//颜色由hsv转换为rgb
-			hsv_color.setTo(Scalar(i*180.f / histsize[0], j*255.f / histsize[1], 255, 0));
+			hsv_color.setTo(Scalar(i*179.f / histsize[0], j*255.f / histsize[1], 255, 0));
 			cvtColor(hsv_color, rgb_color, COLOR_HSV2BGR);
 			Scalar color = rgb_color.at<Vec3b>(0, 0);
 			
@@ -85,32 +90,28 @@ void HSVHist::removeSeg(HSVHist back)
 		nCols *= nRows;
 		nRows = 1;
 	}
-	uchar *psrc, *pback;
+	uchar *psrc;
 	int Hval, Sval;
-	int ncount = 0;
 	for(int i = 0; i < nRows; i++)
 		for (int j = 0; j < nCols; j++)
 		{
-			if (j == 300000)
-				cout << "syk";
+			//提取原图中的色阶
 			psrc = srcimage.ptr<uchar>(i);
-			//printf("%d %d %d\n", psrc[j], psrc[j + 1], psrc[j + 2]);
 			Hval = psrc[j*nChannels]*histsize[0]/180;
 			Sval = psrc[j*nChannels + 1]*histsize[1]/256;
-			pback = back.hsvhist.ptr<uchar>(Hval);
 
 			if (back.hsvhist.at<float>(Hval, Sval) > 0)
-			{
 				for (int k = 0; k < 3; k++)
 					psrc[j*nChannels + k] = 0;
-			}
-			else
-				ncount++;
 		}
+	cvtColor(srcimage, srcimage, CV_HSV2BGR);
 }
 
-void HSVHist::showImage()
+void HSVHist::showImage(string strpath)
 {
-	cvtColor(srcimage, srcimage, CV_HSV2BGR);
-	imshow("result", srcimage);
+	if (strpath == "")
+		strpath = this->path;
+	strpath += "hist";
+	imshow(strpath, srcimage);
+	imwrite("result.jpg", srcimage);
 }
