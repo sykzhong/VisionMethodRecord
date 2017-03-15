@@ -21,7 +21,7 @@ void processImage(int, void*);
 
 int main(int argc, char** argv)
 {
-	const char* filename = "target5.jpg";
+	const char* filename = "E:\\Cloud\\Research\\Vision\\VisionMethodRecord\\Picture\\wp_01.bmp";
 	//读取图像  
 	image = imread(filename, 0);
 	if (image.empty())
@@ -71,7 +71,8 @@ void processImage(int /*h*/, void*)
 		Mat pointsf;
 		//将轮廓中的点转换为以Mat形式存储的2维点集(x,y)  
 		Mat(contours[i]).convertTo(pointsf, CV_32F);
-
+		cout << pointsf.size();
+		//cout << pointsf;
 		//最小二次拟合（Fitzgibbon的方法）  
 		//box包含了椭圆的5个参数：(x,y,w,h,theta)  
 		RotatedRect box = fitEllipse(pointsf);

@@ -8,7 +8,13 @@
 #include <stdio.h>
 using namespace std;
 using namespace cv;
-class ProImage;
+
+const Scalar RED = Scalar(0, 0, 255);
+const Scalar PINK = Scalar(230, 130, 255);
+const Scalar BLUE = Scalar(255, 0, 0);
+const Scalar LIGHTBLUE = Scalar(255, 255, 160);
+const Scalar GREEN = Scalar(0, 255, 0);
+
 class HSVHist
 {
 public:
@@ -18,6 +24,7 @@ public:
 	void getHist();
 	void drawHist();
 	void removeSeg(HSVHist back);
+	static void removeBack(HSVHist dst, HSVHist back);
 	void showImage(string strpath = "");
 	void Init();
 private:
@@ -36,6 +43,7 @@ protected:
 	string path;			//原图路径
 
 	Mat srcimage;			//原图像,读取为HSV格式
+	Mat m_image;
 	Mat hsvhist;			//用于存储直方图计算结果
 	int histsize[3];		//hsv在直方图中分布数
 };

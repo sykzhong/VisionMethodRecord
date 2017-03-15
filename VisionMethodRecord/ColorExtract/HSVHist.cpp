@@ -32,20 +32,21 @@ int HSVHist::getImage(string path)
 	if (!srcimage.data)
 		return 0;
 	this->path = path;
-	cvtColor(srcimage, srcimage, COLOR_BGR2HSV);
+	m_image = srcimage.clone();
+	cvtColor(m_image, m_image, COLOR_BGR2HSV);
 	return 1;
 }
 
 void HSVHist::Init()
 {
-	medianBlur(srcimage, srcimage, 3);
+	//medianBlur(m_image, m_image, 3);
 	getHist();
 	drawHist();
 }
 
 void HSVHist::getHist()
 {
-	split(srcimage, hsvplane);			//通道分离
+	split(m_image, hsvplane);			//通道分离
 	int channels[3] = { 0, 1, 2};
 	calcHist(hsvplane, 3, channels, Mat(), hsvhist, 2, histsize, ranges);		//直方图计算
 	//归一化处理
@@ -77,15 +78,15 @@ void HSVHist::drawHist()
 			
 			rectangle(hist_img, Point(loc*bin_w, hist_h), Point((loc + 1)*bin_w, hist_h - binval), color, -1);
 		}
-	imshow(path, hist_img);
+	//imshow(path, hist_img);
 }
 
 void HSVHist::removeSeg(HSVHist back)
 {
-	int nRows = srcimage.rows;
-	int nCols = srcimage.cols;
-	int nChannels = srcimage.channels();
-	if(srcimage.isContinuous() == true)
+	int nRows = m_image.rows;
+	int nCols = m_image.cols;
+	int nChannels = m_image.channels();
+	if(m_image.isContinuous() == true)
 	{
 		nCols *= nRows;
 		nRows = 1;
@@ -96,7 +97,7 @@ void HSVHist::removeSeg(HSVHist back)
 		for (int j = 0; j < nCols; j++)
 		{
 			//提取原图中的色阶
-			psrc = srcimage.ptr<uchar>(i);
+			psrc = m_image.ptr<uchar>(i);
 			Hval = psrc[j*nChannels]*histsize[0]/180;
 			Sval = psrc[j*nChannels + 1]*histsize[1]/256;
 
@@ -104,7 +105,7 @@ void HSVHist::removeSeg(HSVHist back)
 				for (int k = 0; k < 3; k++)
 					psrc[j*nChannels + k] = 0;
 		}
-	cvtColor(srcimage, srcimage, CV_HSV2BGR);
+	cvtColor(m_image, m_image, CV_HSV2BGR);
 }
 
 void HSVHist::showImage(string strpath)
@@ -112,6 +113,13 @@ void HSVHist::showImage(string strpath)
 	if (strpath == "")
 		strpath = this->path;
 	strpath += "hist";
-	imshow(strpath, srcimage);
-	imwrite("result.jpg", srcimage);
+	imshow(strpath, m_image);
+	//imwrite("result.jpg", m_image);
+}
+
+void HSVHist::removeBack(HSVHist dst, HSVHist back)
+{
+	dst.Init();
+	back.Init();
+	dst.removeSeg(back);
 }
