@@ -10,6 +10,7 @@ public:
 	~CalcLoc();
 	void getHUMoment();
 	void getCenter();
+	void writeResult(string _imgname = "");
 	static void printResult(CalcLoc &dst);
 	static void printResult(time_t nowtime);
 private:

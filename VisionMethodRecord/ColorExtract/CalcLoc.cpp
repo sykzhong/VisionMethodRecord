@@ -41,7 +41,7 @@ void CalcLoc::printResult(CalcLoc &dst)
 	ofstream fresult;
 	fresult.open("result.txt", ios::in | ios::ate);
 	if (fresult.is_open())
-		fresult << dst.m_center << endl;
+		fresult << dst.m_center.x << " " << dst.m_center.y << endl;
 	
 }
 
@@ -51,4 +51,18 @@ void CalcLoc::printResult(time_t nowtime)
 	fresult.open("result.txt", ios::in | ios::ate);
 	if (fresult.is_open())
 		fresult << ctime(&nowtime) << endl;
+}
+
+void CalcLoc::writeResult(string _imgname)
+{
+	Mat result = srcimage.clone();
+	for (int i = 0; i < vecpoly.size(); i++)
+		drawContours(result, vecpoly, i, RED, 2);
+	for (int i = 0; i < vececllipse.size(); i++)
+		ellipse(result, vececllipse[i], RED, 2, CV_AA);
+	circle(result, m_center, 3, RED, -1);
+	if (_imgname == "")
+		_imgname = "result.jpg";
+	//imshow(_imgname, result);
+	imwrite(_imgname, result);
 }

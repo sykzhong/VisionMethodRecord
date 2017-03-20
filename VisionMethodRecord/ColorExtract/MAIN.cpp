@@ -5,7 +5,7 @@
 #include <fstream>
 #include <stdio.h>
 #include <time.h>
-#define MULTIPLE
+#define TEST2
 int main()
 {
 #ifdef SINGLE
@@ -109,6 +109,40 @@ int main()
 		Dstindex += 5;
 	}
 	cout << "Over" << endl;
+	waitKey(0);
+	return 0;
+#elif defined TEST1
+	string strfore = "test2.JPG", strback = "1.bmp";
+	HSVHist src, back;
+	src.getImage(strfore);
+	back.getImage(strback);
+
+	src.getHist();
+	src.drawHist();
+
+	back.getHist();
+	back.drawHist();
+
+	src.removeSeg(back);
+	src.showImage();
+	waitKey(0);
+	return 0;
+#elif defined TEST2
+	string strfore = "4.bmp", strback = "1.bmp";
+	ProImage src, back;
+	src.getImage(strfore);
+	back.getImage(strback);
+	HSVHist::removeBack(src, back);
+
+	src.preproImage();
+	
+	
+	string winname = "test";
+	src.setImageWin(winname);
+	src.showImage();
+
+
+
 	waitKey(0);
 	return 0;
 #endif

@@ -34,7 +34,7 @@ void ProImage::preproImage()
 	//erode(m_image, m_image, element, Point(-1, -1), 1);
 	
 	//morphologyEx(m_image, m_image, MORPH_OPEN, element);
-	//imshow("Proimage", m_image);
+	imshow("Proimage", m_image);
 }
 
 void ProImage::getContour()
