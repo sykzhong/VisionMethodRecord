@@ -9,7 +9,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <time.h>
-#include <map>
+#include <fstream>
 #include "opencv2/imgproc/imgproc.hpp"  
 #include "opencv2/highgui/highgui.hpp"  
 using namespace std;
@@ -17,7 +17,7 @@ using namespace cv;
 
 const double PI = 3.141592654;
 
-vector<Point> vecPoint;
+vector<Point2f> vecPoint;
 Mat image;
 
 struct node
@@ -44,16 +44,76 @@ struct rnode
 	double th;
 };
 
-int getLine(Point &_P, const int &_size, double &_a, double &_b, double &_c, double &_th)
+int getImage()
 {
-	int xstart = max(0, _P.x - _size);
-	int xend = min(image.cols, _P.x + _size);
-	int ystart = max(0, _P.y - _size);
-	int yend = min(image.rows, _P.y + _size);
-	vector<Point> tmpvecPoint;
-	for (int i = xstart; i < xend; i++)
-		for (int j = ystart; j < yend; j++)
-			if (image.at<uchar>(j, i) != 0)
+	const char* filename = "ellipse2.jpg";
+	//读取图像  
+	Mat src = imread(filename, 0);
+	if (src.empty())
+	{
+		cout << "Couldn't open image " << endl;
+		return 0;
+	}
+	vector<vector<Point> > contours;
+	//这句相当于二值化。这个matlab的那句好像： Iwt = Iw>=threshold;  
+	Mat bimage = src >= 10;
+	//Mat bimage;  
+	//threshold(image, bimage, sliderPos, 255,CV_THRESH_BINARY);  
+
+	//提取轮廓,相当于matlab中连通区域分析  
+	findContours(bimage, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
+
+	//我们将在cimage上面绘图  
+	Mat cimage = Mat::zeros(bimage.size(), CV_8UC1);
+	ofstream fresult;
+	fresult.open("contour1.txt", ios::in);
+
+	for (size_t i = 0; i < contours.size(); i++)
+	{
+		//轮廓的边缘点个数  
+		size_t count = contours[i].size();
+		//Fitzgibbon的椭圆拟合方法，要求至少6个点，文献：Direct Least Squares Fitting of Ellipses[1999]  
+		if (count < 6)
+			continue;
+
+		if (fresult.is_open())
+		{
+			for (size_t j = 0; j < contours[i].size(); j++)
+			{
+				fresult << contours[i][j].x << " " << contours[i][j].y << endl;
+			}
+		}
+		drawContours(cimage, contours, (int)i, Scalar::all(255), 1, 8);
+		Mat pointsf;
+		//将轮廓中的点转换为以Mat形式存储的2维点集(x,y)  
+		Mat(contours[i]).convertTo(pointsf, CV_32F);
+
+		//最小二次拟合（Fitzgibbon的方法）  
+		//box包含了椭圆的5个参数：(x,y,w,h,theta)  
+		RotatedRect box = fitEllipse(pointsf);
+
+		//把那些长轴与短轴之比很多的那些椭圆剔除。  
+		if (MAX(box.size.width, box.size.height) > MIN(box.size.width, box.size.height) * 8)
+			continue;
+		//绘制轮廓  
+		
+	}
+
+	
+	imwrite("image1.jpg", cimage);
+
+}
+
+int getLine(Point2f &_P, const int &_size, double &_a, double &_b, double &_c, double &_th)
+{
+	int xstart = max((float)0, _P.x - _size);
+	int xend = min((float)image.cols - 1, _P.x + _size);
+	int ystart = max((float)0, _P.y - _size);
+	int yend = min((float)image.rows - 1, _P.y + _size);
+	vector<Point2f> tmpvecPoint;
+	for (int i = xstart; i <= xend; i++)
+		for (int j = ystart; j <= yend; j++)
+			if (image.at<uchar>(j, i) > 10)
 				tmpvecPoint.push_back(Point(i, j));
 
 	if (tmpvecPoint.size() < 2)
@@ -80,7 +140,7 @@ int getLine(Point &_P, const int &_size, double &_a, double &_b, double &_c, dou
 	for (int i = 0; i < tmpvecPoint.size(); i++)
 	{
 		Dxx += (tmpvecPoint[i].x - x_mean) * (tmpvecPoint[i].x - x_mean);
-		Dxy += fabs((tmpvecPoint[i].x - x_mean) * (tmpvecPoint[i].y - y_mean));
+		Dxy += (tmpvecPoint[i].x - x_mean) * (tmpvecPoint[i].y - y_mean);
 		Dyy += (tmpvecPoint[i].y - y_mean) * (tmpvecPoint[i].y - y_mean);
 	}
 	double lambda = ((Dxx + Dyy) - sqrt((Dxx - Dyy) * (Dxx - Dyy) + 4 * Dxy * Dxy)) / 2.0;
@@ -103,11 +163,15 @@ int getLine(Point &_P, const int &_size, double &_a, double &_b, double &_c, dou
 		_b = (lambda - Dxx) / den;
 		_c = -_a * x_mean - _b * y_mean;
 	}
+
 	if (_b == 0)
 		_th = PI / 2;
 	else
 		_th = atan(-_a / _b);
-	
+
+	if (_th < 0)
+		_th += PI;
+
 	return true;
 }
 
@@ -118,17 +182,18 @@ void checkPoint(int _x, int _y)
 
 int main()
 {
-	freopen("contour.txt", "r", stdin);
-	Point tmppoint;
+	getImage();
+	freopen("contour1.txt", "r", stdin);
+	Point2f tmppoint;
 	string strinput;
 	while (getline(cin, strinput))
 	{
 		if (strinput == "")
 			break;
-		sscanf(strinput.c_str(), "%d %d", &tmppoint.x, &tmppoint.y);
+		sscanf(strinput.c_str(), "%f %f", &tmppoint.x, &tmppoint.y);
 		vecPoint.push_back(tmppoint);
 	}
-	image = imread("image.jpg", 0);
+	image = imread("image1.jpg", 0);
 	if (!image.data)
 		return 0;
 #ifdef TEST
@@ -141,7 +206,7 @@ int main()
 	const int maxindex = vecPoint.size() - 1;
 
 	const int maxiter = vecPoint.size() / 2;				//最大迭代次数
-	const int border = 5;				//l3判断边界角度值
+	const int border = 20;				//l3判断边界角度值
 	int index1, index2;					//l1, l2经过的几点在vecPoint中的位置
 	const int linesize = 2;				//直线拟合领域大小
 	double a1, b1, c1, a2, b2, c2, a3, b3, c3;			//分别记录l1, l2, l3参数
@@ -152,7 +217,7 @@ int main()
 	vector<double> testresult;
 	node tmpnode;
 
-	Point M, T, G;						//M表示P1, P2中点， T表示l1, l2交点, G表示M, T中点
+	Point2f M, T, G;						//M表示P1, P2中点， T表示l1, l2交点, G表示M, T中点
 	for (int i = 0; i < maxiter; i++)
 	{
 		index1 = (rand() % (maxindex - minindex + 1)) + minindex;
@@ -173,6 +238,8 @@ int main()
 			th3 = PI / 2;
 		else
 			th3 = atan(-a3 / b3);
+		if (th3 < 0)
+			th3 += PI;
 		if (fabs(th1 - th2) <= (double)1 / 180 * PI)
 		{
 			i--;
@@ -195,38 +262,30 @@ int main()
 			(double)T.x*(M.y - T.y);
 		
 
-		vector<Point> tobecheck;			//存储MT之间的点
+		vector<Point2f> tobecheck;			//存储MT之间的点
 		double tmpx, tmpy;
-		int tmpxmax = min(image.cols, max(M.x, G.x));
-		int tmpymax = min(image.rows, max(M.y, G.y));
-		for (int j = max(0, min(M.x, G.x)); j < tmpxmax; j++)
+		int tmpxmax = min((float)image.cols - 1, max(M.x, G.x));
+		int tmpymax = min((float)image.rows - 1, max(M.y, G.y));
+		for (int j = max((float)0, min(M.x, G.x)); j <= tmpxmax; j++)
 		{
 			if (bmt == 0)
 			{
-				for (int k = max(0, min(M.y, G.y)); k < tmpymax; k++)
+				for (int k = max((float)0, min(M.y, G.y)); k <= tmpymax; k++)
 				{
 					tmpx = M.x;
 					tmpy = k;
-					tobecheck.push_back(Point(tmpx, tmpy));
+					tobecheck.push_back(Point2f(tmpx, tmpy));
 				}
 			}
 			else
 			{
 				tmpx = j;
 				tmpy = (-amt / bmt)*j - cmt / bmt;
-				if (tmpy < 0)
-				{
-					if (amt != 0)
-					{
-						j = -cmt / amt;			//找出tmpy = 0时的x坐标
-						continue;
-					}
-					else
-						break;						//直接跳出循环
-				}
-				if (tmpy >= tmpymax)
+				if ((tmpy > tmpymax && (-amt / bmt) > 0) || (tmpy < 0 && (-amt / bmt) < 0))
 					break;
-				tobecheck.push_back(Point(tmpx, tmpy));
+				else if (tmpy > tmpymax || tmpy < 0)
+					continue;
+				tobecheck.push_back(Point2f(tmpx, tmpy));
 			}
 		}
 
@@ -235,9 +294,9 @@ int main()
 		{
 			tmpx = tobecheck[j].x;
 			tmpy = tobecheck[j].y;
-			if (image.at<uchar>(tmpy, tmpx) != 0)
+			if (image.at<uchar>(tmpy, tmpx) > 10)
 			{
-				getLine(Point(tmpx, tmpy), linesize, an, bn, cn, thn);
+				getLine(Point2f(tmpx, tmpy), linesize, an, bn, cn, thn);
 				if (fabs(thn - th3) <= (double)border / 180 * PI)
 				{
 					double lambda = -(a1*a2*tmpx*tmpx + (a1*b2 + a2*b1)*tmpx*tmpy + b1*b2*tmpy*tmpy
@@ -251,12 +310,35 @@ int main()
 					tmpnode.F = c1*c2 + lambda*c3*c3;
 					if (tmpnode.B*tmpnode.B - tmpnode.A*tmpnode.C < 0)
 					{
+						Mat tmpresult = image.clone();
+						line(tmpresult, vecPoint[index1], T, Scalar::all(255));
+						line(tmpresult, vecPoint[index2], T, Scalar::all(255));
+						line(tmpresult, vecPoint[index1], vecPoint[index2], Scalar::all(255));
+						line(tmpresult, M, T, Scalar::all(255));
+						if (bn != 0)
+						{
+							Point tmppoint = Point(tmpx + 100, (-an / bn)*(tmpx + 100) - cn / bn);
+							line(tmpresult, Point(tmpx, tmpy), tmppoint, Scalar::all(255));
+						}
+						
 						rnode tmprnode;
 						tmprnode.u = (tmpnode.C*tmpnode.D - tmpnode.B*tmpnode.E) / (tmpnode.B*tmpnode.B - tmpnode.A*tmpnode.C);
 						tmprnode.v = (tmpnode.A*tmpnode.E - tmpnode.B*tmpnode.D) / (tmpnode.B*tmpnode.B - tmpnode.A*tmpnode.C);
+						Point2f tmpcenter = Point2f(tmprnode.u, tmprnode.v);
+
+						circle(tmpresult, tmpcenter, 3, Scalar::all(255), -1);
+						line(tmpresult, tmpcenter, T, Scalar::all(255));
+
+						//Point2f realcenter = Point2f(470, 330);
+						Point2f realcenter = Point2f(528, 351);
+						circle(tmpresult, realcenter, 2, Scalar::all(255), -1);
+						line(tmpresult, realcenter, T, Scalar::all(255));
+
+						circle(tmpresult, M, 2, Scalar::all(255), -1);
 						testresult.push_back(tmprnode.u);
 						//tan(2*th) = 2B / (A - C)
 						//if(A == C) th = +-PI/4
+						imwrite("tmpresult.jpg", tmpresult);
 					}
 				}
 			}
