@@ -7,10 +7,13 @@
 #include <stdlib.h>
 #include <time.h>
 #include <fstream>
+
+#include <Eigen/Dense>
 #include "opencv2/imgproc/imgproc.hpp"  
 #include "opencv2/highgui/highgui.hpp"  
 using namespace std;
 using namespace cv;
+using namespace Eigen;
 
 const double PI = 3.141592654;
 Mat Image;
@@ -23,6 +26,12 @@ struct Line
 	double b;
 	double c;
 	double th;
+};
+
+struct dstPoint
+{
+	vector<Point2f> vecPoint;		//用于计算的三点
+	Point2f center;
 };
 
 struct Pointnum
@@ -55,7 +64,7 @@ int createEllipse(const char* filename = "")
 	for (size_t i = 0; i < contours.size(); i++)
 	{
 		size_t count = contours[i].size();
-		if (count < 6)
+		if (count < 6 || (i > 0 && contours[i].size() < contours[i-1].size()))
 			continue;
 
 		if (fresult.is_open())
@@ -135,7 +144,7 @@ int Comparei(int &first, int &second)
 
 int main()
 {
-	createEllipse();
+	createEllipse("ellipse3.jpg");
 	freopen("contour1.txt", "r", stdin);
 	Point2f tmppoint;
 	string strinput;
@@ -154,9 +163,10 @@ int main()
 	Line l12, l23;				//l12 l23表示过12中点中心 23中点中心的直线
 
 	Point2f p1, p2, p3;			//三点p1, p2, p3
+	int index1, index2, index3;	//三点的坐标
 	Point2f p12, p23;			//三切线交点
 
-	const int linesize = 5;		//用于直线拟合的范围
+	const int linesize = 6;		//用于直线拟合的范围(important)
 
 	srand((unsigned)time(NULL));			//初始化随机函数
 	const int minindex = 0;
@@ -164,21 +174,39 @@ int main()
 
 	const int maxiter = orgPoint.size();	//最大迭代次数
 
+	float res = 5;		//判断精度
+	int xnum = Image.cols / res;
+	int ynum = Image.rows / res;
+	vector<vector<vector<dstPoint>>> result(xnum, vector<vector<dstPoint>>(ynum));		//用于存储判断点，二维数组行表示x，列表示y
+	dstPoint tmpdstpoint;
+
 	Point2f tmpcenter;
 	vector<Point2f> veccenter;
 
+	vector<Line> vecLine(orgPoint.size());
+	//int debugcount = 0;
+	for (int i = 0; i < orgPoint.size(); i++)
+	{
+		//cout << debugcount++ << endl;
+		//if(i == 1400)
+		getLine(orgPoint[i], linesize, vecLine[i]);
+	}
+
 	for (int i = 0; i < maxiter; i++)
 	{
-		p1 = orgPoint[(rand() % (maxindex - minindex + 1)) + minindex];
-		p2 = orgPoint[(rand() % (maxindex - minindex + 1)) + minindex];
-		p3 = orgPoint[(rand() % (maxindex - minindex + 1)) + minindex];
-		if (getDist(p1, p2) < 30 || getDist(p2, p3) < 30)
+		index1 = (rand() % (maxindex - minindex + 1)) + minindex;
+		index2 = (rand() % (maxindex - minindex + 1)) + minindex;
+		index3 = (rand() % (maxindex - minindex + 1)) + minindex;
+		l1 = vecLine[index1];
+		l2 = vecLine[index2];
+		l3 = vecLine[index3];
+		if (fabs(l1.th - l2.th) <= (double)5 / 180 * PI || fabs(l2.th - l3.th) <= (double)5 / 180 * PI)
 			continue;
 
-		getLine(p1, linesize, l1);
-		getLine(p2, linesize, l2);
-		getLine(p3, linesize, l3);
-		if (fabs(l1.th - l2.th) <= (double)5 / 180 * PI || fabs(l2.th - l3.th) <= (double)5 / 180 * PI)
+		p1 = orgPoint[index1];
+		p2 = orgPoint[index2];
+		p3 = orgPoint[index3];
+		if (getDist(p1, p2) < 50 || getDist(p2, p3) < 50)
 			continue;
 
 		getIntersection(l1, l2, p12);
@@ -190,42 +218,95 @@ int main()
 		getIntersection(l12, l23, tmpcenter);
 		if (tmpcenter.x < 0 || tmpcenter.y < 0 || tmpcenter.x > Image.cols || tmpcenter.y > Image.rows)
 			continue;
+		else
+		{
+			int xindex, yindex;
+			
+			xindex = tmpcenter.x / res;
+			yindex = tmpcenter.y / res;
+			tmpdstpoint.vecPoint.push_back(p1);
+			tmpdstpoint.vecPoint.push_back(p2);
+			tmpdstpoint.vecPoint.push_back(p3);
+			tmpdstpoint.center = tmpcenter;
+			result[xindex][yindex].push_back(tmpdstpoint);
+		}
 		veccenter.push_back(tmpcenter);
 	}
+	int tmpxindex = 0;
+	int tmpyindex = 0;
+	int tmpmaxsize = 0;
+	for(int i = 0; i < xnum; i++)
+		for (int j = 0; j < ynum; j++)
+		{
+			if (result[i][j].size() > tmpmaxsize)
+			{
+				tmpmaxsize = result[i][j].size();
+				tmpxindex = i;
+				tmpyindex = j;
+			}
+		}
+	
+	VectorXf A(3), B(3);
+	MatrixXf X(3, 3);
+	B << 1, 1, 1;
 
-	float res = 0.5;		//判断精度
-	vector<int> xHalc(Image.cols / res, 0);
-	vector<int> yHalc(Image.cols / res, 0);
-
-	for (int i = 0; i < veccenter.size(); i++)
+	float xprime[3], yprime[3];
+	float th;
+	vector<float> vecth;
+	for (int i = 0; i < result[tmpxindex][tmpyindex].size(); i++)
 	{
-		int xindex, yindex;
-		xindex = veccenter[i].x / res;
-		yindex = veccenter[i].y / res;
-		xHalc[xindex]++;
-		yHalc[yindex]++;
+		tmpdstpoint = result[tmpxindex][tmpyindex][i];
+		for (int j = 0; j < 3; j++)
+		{
+			xprime[j] = tmpdstpoint.vecPoint[j].x - tmpdstpoint.center.x;
+			yprime[j] = tmpdstpoint.vecPoint[j].y - tmpdstpoint.center.y;
+		}
+
+		X << xprime[0] * xprime[0], 2 * xprime[0] * yprime[0], yprime[0] * yprime[0],
+			xprime[1] * xprime[1], 2 * xprime[1] * yprime[1], yprime[1] * yprime[1],
+			xprime[2] * xprime[2], 2 * xprime[2] * yprime[2], yprime[2] * yprime[2];
+
+		A = X.inverse()*B;
+		
+		/*if (A[0] != A[2])
+		{
+			th = atan(2 * A[1] / (A[0] - A[2]));
+			th /= 2;
+		}
+		else th = PI / 4;*/
+
+		if (A[1] == 0 && A[0] <= A[2])
+			th = 0;
+		else if (A[1] == 0 && A[0] > A[2])
+			th = PI / 2;
+		else
+			th = atan((A[2] - A[0] - sqrt((A[0] - A[2])*(A[0] - A[2]) + A[1] * A[1])) / A[1]);
+
+		th = th / PI * 180;
+
+		vecth.push_back(th);
+
+		//cout << A << endl;
+		//cout << th / PI * 180 << endl;
+		//cout << endl;
 	}
+	sort(vecth.begin(), vecth.end());
 
-	Point2f finalcenter;
-	finalcenter.x = (max_element(xHalc.begin(), xHalc.end(), Comparei) - xHalc.begin()) * res;
-	finalcenter.y = (max_element(yHalc.begin(), yHalc.end(), Comparei) - yHalc.begin()) * res;
+	//vector<int> xHalc(Image.cols / res, 0);
+	//vector<int> yHalc(Image.cols / res, 0);
 
-	//sort(veccenter.begin(), veccenter.end(), Comparex);
-	//vector<int> vecHalc(Image.cols, 0);			//以1作为边界
-	//float start = veccenter.begin()->x;
-	//int tmpindex = 0;
-	//int tmpcount = 0;
-	//for (tmpindex = 0; tmpindex < veccenter.size(); tmpindex++)
+	//for (int i = 0; i < veccenter.size(); i++)
 	//{
-	//	if (veccenter[tmpindex].x <= start + 1)
-	//		tmpcount++;
-	//	else
-	//	{
-	//		vecHalc[start] = tmpcount;
-	//		tmpcount = 0;
-	//		start++;
-	//		tmpindex--;
-	//	}
+	//	int xindex, yindex;
+	//	xindex = veccenter[i].x / res;
+	//	yindex = veccenter[i].y / res;
+	//	xHalc[xindex]++;
+	//	yHalc[yindex]++;
 	//}
 
+	//Point2f finalcenter;
+	//finalcenter.x = (max_element(xHalc.begin(), xHalc.end(), Comparei) - xHalc.begin()) * res;
+	//finalcenter.y = (max_element(yHalc.begin(), yHalc.end(), Comparei) - yHalc.begin()) * res;
+
+	
 }
