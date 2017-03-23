@@ -104,6 +104,9 @@ int getImage()
 
 }
 
+#define OPENCVLINE
+
+#ifndef OPENCVLINE
 int getLine(Point2f &_P, const int &_size, double &_a, double &_b, double &_c, double &_th)
 {
 	int xstart = max((float)0, _P.x - _size);
@@ -174,10 +177,48 @@ int getLine(Point2f &_P, const int &_size, double &_a, double &_b, double &_c, d
 
 	return true;
 }
-
-void checkPoint(int _x, int _y)
+#else
+int getLine(Point2f &_P, const int &_size, double &_a, double &_b, double &_c, double &_th)
 {
-	
+	int xstart = max((float)0, _P.x - _size);
+	int xend = min((float)image.cols - 1, _P.x + _size);
+	int ystart = max((float)0, _P.y - _size);
+	int yend = min((float)image.rows - 1, _P.y + _size);
+	vector<Point2f> tmpvecPoint;
+	for (int i = xstart; i <= xend; i++)
+		for (int j = ystart; j <= yend; j++)
+			if (image.at<uchar>(j, i) > 10)
+				tmpvecPoint.push_back(Point(i, j));
+
+	Vec4f line;
+	fitLine(tmpvecPoint, line, CV_DIST_HUBER, 0, 0.01, 0.01);
+	_a = -line[1];
+	_b = line[0];
+	double x0 = line[2], y0 = line[3];
+	_c = -(_a*x0 + _b*y0);
+	if (_b == 0)
+		_th = PI / 2;
+	else
+		_th = atan(-_a / _b);
+
+	if (_th < 0)
+		_th += PI;
+
+
+	return true;
+}
+#endif
+
+double getDist(Point2f first, Point2f second)
+{
+	Point2f tmp = first - second;
+
+	return sqrt(tmp.x*tmp.x + tmp.y*tmp.y);
+}
+
+int Comparex(Point2f first, Point2f second)
+{
+	return first.x < second.x;
 }
 
 int main()
@@ -196,25 +237,21 @@ int main()
 	image = imread("image1.jpg", 0);
 	if (!image.data)
 		return 0;
-#ifdef TEST
-	imshow("", image);
-	waitKey(0);
-	return 0;
-#else
+
 	srand((unsigned)time(NULL));		//初始化随机函数
 	const int minindex = 0;
 	const int maxindex = vecPoint.size() - 1;
 
-	const int maxiter = vecPoint.size() / 2;				//最大迭代次数
+	const int maxiter = vecPoint.size();				//最大迭代次数
 	const int border = 20;				//l3判断边界角度值
 	int index1, index2;					//l1, l2经过的几点在vecPoint中的位置
-	const int linesize = 2;				//直线拟合领域大小
+	const int linesize = 5;				//直线拟合领域大小
 	double a1, b1, c1, a2, b2, c2, a3, b3, c3;			//分别记录l1, l2, l3参数
 	double th1, th2, th3;
 	double an, bn, cn, thn;					//记录P3切线参数
 
 	vector<rnode> result;
-	vector<double> testresult;
+	vector<Point> testresult;
 	node tmpnode;
 
 	Point2f M, T, G;						//M表示P1, P2中点， T表示l1, l2交点, G表示M, T中点
@@ -222,7 +259,8 @@ int main()
 	{
 		index1 = (rand() % (maxindex - minindex + 1)) + minindex;
 		index2 = (rand() % (maxindex - minindex + 1)) + minindex;
-		if (index1 == index2)
+		if (index1 == index2 || 
+			getDist(vecPoint[index1], vecPoint[index2]) < 30)
 		{
 			i--;
 			continue;
@@ -310,42 +348,78 @@ int main()
 					tmpnode.F = c1*c2 + lambda*c3*c3;
 					if (tmpnode.B*tmpnode.B - tmpnode.A*tmpnode.C < 0)
 					{
-						Mat tmpresult = image.clone();
-						line(tmpresult, vecPoint[index1], T, Scalar::all(255));
-						line(tmpresult, vecPoint[index2], T, Scalar::all(255));
-						line(tmpresult, vecPoint[index1], vecPoint[index2], Scalar::all(255));
-						line(tmpresult, M, T, Scalar::all(255));
-						if (bn != 0)
-						{
-							Point tmppoint = Point(tmpx + 100, (-an / bn)*(tmpx + 100) - cn / bn);
-							line(tmpresult, Point(tmpx, tmpy), tmppoint, Scalar::all(255));
-						}
+						//Mat tmpresult = image.clone();
+						//line(tmpresult, vecPoint[index1], T, Scalar::all(255));
+						//line(tmpresult, vecPoint[index2], T, Scalar::all(255));
+						//line(tmpresult, vecPoint[index1], vecPoint[index2], Scalar::all(255));
+						//line(tmpresult, M, T, Scalar::all(255));
+						//if (bn != 0)
+						//{
+						//	Point2f tmppoint = Point2f(tmpx + 100, (-an / bn)*(tmpx + 100) - cn / bn);
+						//	line(tmpresult, Point2f(tmpx, tmpy), tmppoint, Scalar::all(255));
+						//}
+						//
 						
-						rnode tmprnode;
-						tmprnode.u = (tmpnode.C*tmpnode.D - tmpnode.B*tmpnode.E) / (tmpnode.B*tmpnode.B - tmpnode.A*tmpnode.C);
-						tmprnode.v = (tmpnode.A*tmpnode.E - tmpnode.B*tmpnode.D) / (tmpnode.B*tmpnode.B - tmpnode.A*tmpnode.C);
-						Point2f tmpcenter = Point2f(tmprnode.u, tmprnode.v);
+						
+						
+						Point tmprnode;
+						tmprnode.x = cvRound((tmpnode.C*tmpnode.D - tmpnode.B*tmpnode.E) / (tmpnode.B*tmpnode.B - tmpnode.A*tmpnode.C));
+						tmprnode.y = cvRound((tmpnode.A*tmpnode.E - tmpnode.B*tmpnode.D) / (tmpnode.B*tmpnode.B - tmpnode.A*tmpnode.C));
+						if (tmprnode.x < 0 || tmprnode.y < 0 || tmprnode.x > image.cols || tmprnode.y > image.rows)
+							continue;
+						else
+							testresult.push_back(tmprnode);
 
-						circle(tmpresult, tmpcenter, 3, Scalar::all(255), -1);
-						line(tmpresult, tmpcenter, T, Scalar::all(255));
+						//Point2f tmpcenter = Point2f(tmprnode.x, tmprnode.y);
 
-						//Point2f realcenter = Point2f(470, 330);
-						Point2f realcenter = Point2f(528, 351);
-						circle(tmpresult, realcenter, 2, Scalar::all(255), -1);
-						line(tmpresult, realcenter, T, Scalar::all(255));
+						//circle(tmpresult, tmpcenter, 3, Scalar::all(255), -1);
+						//line(tmpresult, tmpcenter, T, Scalar::all(255));
 
-						circle(tmpresult, M, 2, Scalar::all(255), -1);
-						testresult.push_back(tmprnode.u);
-						//tan(2*th) = 2B / (A - C)
-						//if(A == C) th = +-PI/4
-						imwrite("tmpresult.jpg", tmpresult);
+						////Point2f realcenter = Point2f(470, 330);
+						//Point2f realcenter = Point2f(528, 351);
+						//circle(tmpresult, realcenter, 2, Scalar::all(255), -1);
+						//line(tmpresult, realcenter, T, Scalar::all(255));
+
+						//circle(tmpresult, M, 2, Scalar::all(255), -1);
+						//imwrite("tmpresult.jpg", tmpresult);
 					}
 				}
 			}
 		}
 	}
-	sort(testresult.begin(), testresult.end());
+	sort(testresult.begin(), testresult.end(), Comparex);
+	vector<int> vecHalc(image.cols, 0);			//以1作为边界
+	float start = testresult.begin()->x;
+	int tmpindex1 = 0, tmpindex2 = 0;
+	int tmpcount = 0;
+	for (tmpindex1 = 0; tmpindex1 < testresult.size(); tmpindex1++)
+	{
+		if (testresult[tmpindex1].x <= start + 1)
+			tmpcount++;
+		else
+		{
+			vecHalc[start] = tmpcount;
+			tmpcount = 0;
+			start++;
+			tmpindex1--;
+		}
+	}
+
+	Mat tmpimg = Mat(image.size(), CV_8UC1, Scalar::all(0));
+	float x_mean = 0, y_mean = 0;
+	for (int i = 0; i < testresult.size(); i++)
+	{
+		circle(tmpimg, testresult[i], 2, Scalar::all(255), -1);
+		x_mean += testresult[i].x;
+		y_mean += testresult[i].y;
+	}
+	x_mean /= testresult.size();
+	y_mean /= testresult.size();
+	cout << x_mean << endl;
+	cout << y_mean << endl;
+	imshow("result", tmpimg);
+	waitKey(0);
+	//sort(testresult.begin(), testresult.end());
     return 0;
-#endif
 }
 
