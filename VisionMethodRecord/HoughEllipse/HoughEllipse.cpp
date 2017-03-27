@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <fstream>
+#include <map>
 
 #include <Eigen/Dense>
 #include "opencv2/imgproc/imgproc.hpp"  
@@ -144,7 +145,7 @@ int Comparei(int &first, int &second)
 
 int main()
 {
-	createEllipse("ellipse3.jpg");
+	createEllipse("test1.jpg");
 	freopen("contour1.txt", "r", stdin);
 	Point2f tmppoint;
 	string strinput;
@@ -166,29 +167,25 @@ int main()
 	int index1, index2, index3;	//三点的坐标
 	Point2f p12, p23;			//三切线交点
 
-	const int linesize = 6;		//用于直线拟合的范围(important)
+	const int linesize = 4;		//用于直线拟合的范围(important)
 
 	srand((unsigned)time(NULL));			//初始化随机函数
 	const int minindex = 0;
 	const int maxindex = orgPoint.size() - 1;
 
-	const int maxiter = orgPoint.size();	//最大迭代次数
+	const int maxiter = orgPoint.size();	//最大迭代次数(important)
 
-	float res = 5;		//判断精度
-	int xnum = Image.cols / res;
-	int ynum = Image.rows / res;
-	vector<vector<vector<dstPoint>>> result(xnum, vector<vector<dstPoint>>(ynum));		//用于存储判断点，二维数组行表示x，列表示y
+	double locres = 1;		//判断精度
 	dstPoint tmpdstpoint;
+	map<double, vector<dstPoint>> result;
 
 	Point2f tmpcenter;
 	vector<Point2f> veccenter;
 
 	vector<Line> vecLine(orgPoint.size());
-	//int debugcount = 0;
+
 	for (int i = 0; i < orgPoint.size(); i++)
 	{
-		//cout << debugcount++ << endl;
-		//if(i == 1400)
 		getLine(orgPoint[i], linesize, vecLine[i]);
 	}
 
@@ -220,42 +217,56 @@ int main()
 			continue;
 		else
 		{
-			int xindex, yindex;
-			
-			xindex = tmpcenter.x / res;
-			yindex = tmpcenter.y / res;
+			double xindex, yindex;
+			tmpdstpoint.vecPoint.clear();
+			xindex = tmpcenter.x / locres;
+			yindex = tmpcenter.y / locres;
 			tmpdstpoint.vecPoint.push_back(p1);
 			tmpdstpoint.vecPoint.push_back(p2);
 			tmpdstpoint.vecPoint.push_back(p3);
 			tmpdstpoint.center = tmpcenter;
-			result[xindex][yindex].push_back(tmpdstpoint);
+			result[yindex*Image.cols + xindex].push_back(tmpdstpoint);
+			//result[xindex][yindex].push_back(tmpdstpoint);
 		}
 		veccenter.push_back(tmpcenter);
 	}
-	int tmpxindex = 0;
-	int tmpyindex = 0;
+	//int tmpxindex = 0;
+	//int tmpyindex = 0;
+	//int tmpmaxsize = 0;
+	//for(int i = 0; i < xnum; i++)
+	//	for (int j = 0; j < ynum; j++)
+	//	{
+	//		if (result[i][j].size() > tmpmaxsize)
+	//		{
+	//			tmpmaxsize = result[i][j].size();
+	//			tmpxindex = i;
+	//			tmpyindex = j;
+	//		}
+	//	}
+	//
+
+	int tmpindex;
 	int tmpmaxsize = 0;
-	for(int i = 0; i < xnum; i++)
-		for (int j = 0; j < ynum; j++)
+	map<int, vector<dstPoint>>::iterator iter;
+	for (iter = result.begin(); iter != result.end(); iter++)
+		if ((*iter).second.size() > tmpmaxsize)
 		{
-			if (result[i][j].size() > tmpmaxsize)
-			{
-				tmpmaxsize = result[i][j].size();
-				tmpxindex = i;
-				tmpyindex = j;
-			}
+			tmpmaxsize = (*iter).second.size();
+			tmpindex = iter->first;
 		}
-	
-	VectorXf A(3), B(3);
-	MatrixXf X(3, 3);
+	VectorXd A(3), B(3);
+	MatrixXd X(3, 3);
 	B << 1, 1, 1;
 
-	float xprime[3], yprime[3];
-	float th;
-	vector<float> vecth;
-	for (int i = 0; i < result[tmpxindex][tmpyindex].size(); i++)
+	double xprime[3], yprime[3];
+	double th;
+	vector<double> vecth;
+
+
+
+	for (int i = 0; i < result[tmpindex].size(); i++)
 	{
-		tmpdstpoint = result[tmpxindex][tmpyindex][i];
+		tmpdstpoint = result[tmpindex][i];
 		for (int j = 0; j < 3; j++)
 		{
 			xprime[j] = tmpdstpoint.vecPoint[j].x - tmpdstpoint.center.x;
@@ -267,11 +278,11 @@ int main()
 			xprime[2] * xprime[2], 2 * xprime[2] * yprime[2], yprime[2] * yprime[2];
 
 		A = X.inverse()*B;
-		
+
 		/*if (A[0] != A[2])
 		{
-			th = atan(2 * A[1] / (A[0] - A[2]));
-			th /= 2;
+		th = atan(2 * A[1] / (A[0] - A[2]));
+		th /= 2;
 		}
 		else th = PI / 4;*/
 
@@ -292,21 +303,60 @@ int main()
 	}
 	sort(vecth.begin(), vecth.end());
 
-	//vector<int> xHalc(Image.cols / res, 0);
-	//vector<int> yHalc(Image.cols / res, 0);
+	//for (int i = 0; i < result[tmpxindex][tmpyindex].size(); i++)
+	//{
+	//	tmpdstpoint = result[tmpxindex][tmpyindex][i];
+	//	for (int j = 0; j < 3; j++)
+	//	{
+	//		xprime[j] = tmpdstpoint.vecPoint[j].x - tmpdstpoint.center.x;
+	//		yprime[j] = tmpdstpoint.vecPoint[j].y - tmpdstpoint.center.y;
+	//	}
+
+	//	X << xprime[0] * xprime[0], 2 * xprime[0] * yprime[0], yprime[0] * yprime[0],
+	//		xprime[1] * xprime[1], 2 * xprime[1] * yprime[1], yprime[1] * yprime[1],
+	//		xprime[2] * xprime[2], 2 * xprime[2] * yprime[2], yprime[2] * yprime[2];
+
+	//	A = X.inverse()*B;
+	//	
+	//	/*if (A[0] != A[2])
+	//	{
+	//		th = atan(2 * A[1] / (A[0] - A[2]));
+	//		th /= 2;
+	//	}
+	//	else th = PI / 4;*/
+
+	//	if (A[1] == 0 && A[0] <= A[2])
+	//		th = 0;
+	//	else if (A[1] == 0 && A[0] > A[2])
+	//		th = PI / 2;
+	//	else
+	//		th = atan((A[2] - A[0] - sqrt((A[0] - A[2])*(A[0] - A[2]) + A[1] * A[1])) / A[1]);
+
+	//	th = th / PI * 180;
+
+	//	vecth.push_back(th);
+
+	//	//cout << A << endl;
+	//	//cout << th / PI * 180 << endl;
+	//	//cout << endl;
+	//}
+	//sort(vecth.begin(), vecth.end());
+
+	//vector<int> xHalc(Image.cols / locres, 0);
+	//vector<int> yHalc(Image.cols / locres, 0);
 
 	//for (int i = 0; i < veccenter.size(); i++)
 	//{
 	//	int xindex, yindex;
-	//	xindex = veccenter[i].x / res;
-	//	yindex = veccenter[i].y / res;
+	//	xindex = veccenter[i].x / locres;
+	//	yindex = veccenter[i].y / locres;
 	//	xHalc[xindex]++;
 	//	yHalc[yindex]++;
 	//}
 
 	//Point2f finalcenter;
-	//finalcenter.x = (max_element(xHalc.begin(), xHalc.end(), Comparei) - xHalc.begin()) * res;
-	//finalcenter.y = (max_element(yHalc.begin(), yHalc.end(), Comparei) - yHalc.begin()) * res;
+	//finalcenter.x = (max_element(xHalc.begin(), xHalc.end(), Comparei) - xHalc.begin()) * locres;
+	//finalcenter.y = (max_element(yHalc.begin(), yHalc.end(), Comparei) - yHalc.begin()) * locres;
 
 	
 }
