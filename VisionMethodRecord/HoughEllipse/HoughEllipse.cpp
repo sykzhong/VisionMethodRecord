@@ -12,9 +12,14 @@
 #include <Eigen/Dense>
 #include "opencv2/imgproc/imgproc.hpp"  
 #include "opencv2/highgui/highgui.hpp"  
+
+
+#include "easylogging++.h"
 using namespace std;
 using namespace cv;
 using namespace Eigen;
+using namespace el;
+
 
 const double PI = 3.141592654;
 Mat Image;
@@ -161,11 +166,16 @@ void drawellipse(dstPoint &src, Mat &dst)
 	ellipse(dst, rect, Scalar(0, 0, 255), 2);
 }
 
+INITIALIZE_EASYLOGGINGPP
+
 int main()
 {
-	Mat srcImage;
-	createEllipse(srcImage, "test1.jpg");
+	Configurations conf("my-conf.conf");
+	Loggers::reconfigureLogger("default", conf);
+	LOG(TRACE) << "Begin";
 
+	Mat srcImage;
+	createEllipse(srcImage, "test2.jpg");
 	freopen("contour1.txt", "r", stdin);
 	Point2f tmppoint;
 	string strinput;
@@ -187,15 +197,17 @@ int main()
 	int index1, index2, index3;	//三点的坐标
 	Point2f p12, p23;			//三切线交点
 
-	const int linesize = 4;		//用于直线拟合的范围(important)
-
 	srand((unsigned)time(NULL));			//初始化随机函数
 	const int minindex = 0;
 	const int maxindex = orgPoint.size() - 1;
 
+	///////////////////用于调节的重要参数//////////////
+	const int linesize = 4;					//用于直线拟合的范围(important)
 	const int maxiter = 10*orgPoint.size();	//最大迭代次数(important)
+	double locres = 1;						//椭圆中心位置调节精度
+	double angleres = 1;					//角度识别精度
+	////////////////////////////////////////////////////
 
-	double locres = 1;						//判断精度
 	dstPoint tmpdstpoint;					//用于暂存各三点构成的结果
 	map<int, vector<dstPoint>> result;		//结果集合
 
@@ -263,15 +275,12 @@ int main()
 	B << 1, 1, 1;
 
 	double xprime[3], yprime[3];
-	vector<double> vecth;
 
-	double angleres = 1;			//角度识别精度
 
 	for (int i = 0; i < result[locindex].size(); i++)
 	{
 		dstPoint &tmpdstpoint = result[locindex][i];
 		double &th = tmpdstpoint.th;
-		cout << tmpdstpoint.center << endl;
 		for (int j = 0; j < 3; j++)
 		{
 			xprime[j] = tmpdstpoint.vecPoint[j].x - tmpdstpoint.center.x;
@@ -284,15 +293,19 @@ int main()
 
 		A = X.inverse()*B;
 
+		if (_isnan(A[0]) || _isnan(A[1]) || _isnan(A[2]))			//当X无法求逆时，跳过该结果
+		{
+			result[locindex].erase(result[locindex].begin() + i);
+			i--;
+			continue;
+		}
+
 		if (A[1] == 0 && A[0] <= A[2])
 			th = 0;
 		else if (A[1] == 0 && A[0] > A[2])
 			th = PI / 2;
 		else
 			th = atan((A[2] - A[0] - sqrt((A[0] - A[2])*(A[0] - A[2]) + 4 * A[1] * A[1])) / (2*A[1]));
-
-		//th += PI / 2;
-		//th *= 2;
 
 		VectorXd C(2), D(2);			//Y*D = C
 		MatrixXd Y(2, 2);
@@ -305,14 +318,17 @@ int main()
 		D = Y.inverse()*C;
 
 		tmpdstpoint.th = tmpdstpoint.th / PI * 180;
-		//tmpdstpoint.th *= 2;
-		//if (tmpdstpoint.th < -90)
-		//	tmpdstpoint.th += 90;
-
 		tmpdstpoint.width = 2*min(sqrt(1 / D[0]), sqrt(1 / D[1]));
 		tmpdstpoint.height = 2*max(sqrt(1 / D[0]), sqrt(1 / D[1]));
-	}
+		
+		//LOG(TRACE) << "\nX = \n" << X;
+		//LOG(TRACE) << "\nX^-1 = \n" << X.inverse();
+		//LOG(TRACE) << "_isnan(width) = " << _isnan(tmpdstpoint.width);
+		//LOG(TRACE) << "\nD = \n" << D;
+		//LOG(TRACE) << "th = " << th;
+		//LOG(TRACE) << "width = " << tmpdstpoint.width << "\n";
 
+	}
 
 	int tmpmaxsize = 0;
 	int tmpindex = 0;
@@ -323,22 +339,11 @@ int main()
 	dstPoint meanresult;
 	dstPoint tmpresult;
 
-	//Point2f tmploc = Point2f(0, 0);
-	//Point2f meanloc;
-
-	//double tmpth = 0;
-	//double meanth;
-
-	//double meanwidth;
-	//double meanheigh;
-	//double tmpwidth = 0;
-	//double tmpheight = 0;
-
 	vector<dstPoint> &vecdstpoint = result[locindex];
 	sort(vecdstpoint.begin(), vecdstpoint.end(), Compareth);
 	for (int i = 0; i < vecdstpoint.size(); i++)
 	{
-		if (vecdstpoint[i].th < vecdstpoint[tmpindex].th + angleres)
+		if (vecdstpoint[i].th <= vecdstpoint[tmpindex].th + angleres)
 		{
 			tmpmaxsize++;
 
@@ -374,5 +379,8 @@ int main()
 	cvtColor(srcImage, srcImage, CV_GRAY2BGR);
 	drawellipse(meanresult, srcImage);
 	imshow("result", srcImage);
+	//cvtColor(Image, Image, CV_GRAY2BGR);
+	//drawellipse(meanresult, Image);
+	//imshow("result", Image);
 	waitKey(0);
 }

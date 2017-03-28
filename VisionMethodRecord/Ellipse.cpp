@@ -21,7 +21,7 @@ void processImage(int, void*);
 
 int main(int argc, char** argv)
 {
-	const char* filename = "test1.jpg";
+	const char* filename = "test2.jpg";
 	//读取图像  
 	image = imread(filename, 0);
 	if (image.empty())
@@ -58,8 +58,9 @@ void processImage(int /*h*/, void*)
 	findContours(bimage, contours, CV_RETR_LIST, CV_CHAIN_APPROX_NONE);
 
 	//我们将在cimage上面绘图  
-	Mat cimage = Mat::zeros(bimage.size(), CV_8UC3);
-
+	//Mat cimage = Mat::zeros(bimage.size(), CV_8UC3);
+	Mat cimage = image.clone();
+	cvtColor(cimage, cimage, CV_GRAY2BGR);
 	for (size_t i = 0; i < contours.size(); i++)
 	{
 		//轮廓的边缘点个数  
@@ -81,10 +82,10 @@ void processImage(int /*h*/, void*)
 		if (MAX(box.size.width, box.size.height) > MIN(box.size.width, box.size.height) * 8)
 			continue;
 		//绘制轮廓  
-		drawContours(cimage, contours, (int)i, Scalar::all(255), 1, 8);
+		//drawContours(cimage, contours, (int)i, Scalar::all(255), 1, 8);
 
 		//绘制椭圆  
-		ellipse(cimage, box, Scalar(0, 0, 255), 1, CV_AA);
+		ellipse(cimage, box, Scalar(0, 0, 255), 2, CV_AA);
 		//绘制椭圆  
 		// ellipse(cimage, box.center, box.size*0.5f, box.angle, 0, 360, Scalar(0,255,255), 1, CV_AA);  
 
@@ -92,8 +93,8 @@ void processImage(int /*h*/, void*)
 		Point2f vtx[4];
 		//成员函数points 返回 4个矩形的顶点(x,y)  
 		box.points(vtx);
-		for (int j = 0; j < 4; j++)
-			line(cimage, vtx[j], vtx[(j + 1) % 4], Scalar(0, 255, 0), 1, CV_AA);
+		//for (int j = 0; j < 4; j++)
+		//	line(cimage, vtx[j], vtx[(j + 1) % 4], Scalar(0, 255, 0), 1, CV_AA);
 	}
 
 	imshow("result", cimage);
