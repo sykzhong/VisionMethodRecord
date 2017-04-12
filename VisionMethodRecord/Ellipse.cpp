@@ -21,7 +21,7 @@ void processImage(int, void*);
 
 int main(int argc, char** argv)
 {
-	const char* filename = "test2.jpg";
+	const char* filename = "houghtest.jpg";
 	//¶ÁÈ¡Í¼Ïñ  
 	image = imread(filename, 0);
 	if (image.empty())
