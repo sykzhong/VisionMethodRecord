@@ -15,15 +15,22 @@ static const Scalar GREEN = Scalar(0, 255, 0);
 static const Scalar BLACK = Scalar(0, 0, 0);
 static const Scalar WHITE = Scalar(255, 255, 255);
 
-void calcHSComponent(Mat &image, int &Hbin, int &Sbin, vector<int> &Hclass, vector<int> &Sclass)
-{
-	Hclass.clear();
-	Hclass.resize(180 / Hbin);
-	fill(Hclass.begin(), Hclass.end(), 0);
+int Hbin = 1;
+int Sbin = 1;
+int Ibin = 1;
+vector<int> Hclass;
+vector<int> Sclass;
+vector<int> Iclass;
 
-	Sclass.clear();
-	Sclass.resize(256 / Sbin);
-	fill(Sclass.begin(), Sclass.end(), 0);
+void calcHSComponent(Mat &image, int &_Hbin, int &_Sbin, vector<int> &_Hclass, vector<int> &_Sclass)
+{
+	_Hclass.clear();
+	_Hclass.resize(180 / _Hbin);
+	fill(_Hclass.begin(), _Hclass.end(), 0);
+
+	_Sclass.clear();
+	_Sclass.resize(256 / _Sbin);
+	fill(_Sclass.begin(), _Sclass.end(), 0);
 
 	int nChannels = image.channels();
 	int nRows = image.rows;
@@ -40,22 +47,22 @@ void calcHSComponent(Mat &image, int &Hbin, int &Sbin, vector<int> &Hclass, vect
 		for (int j = 0; j < nCols; j++)
 		{
 			p = image.ptr<uchar>(i);
-			Hindex = p[j*nChannels] / Hbin;
-			Sindex = p[j*nChannels + 1] / Sbin;
-			Hclass[Hindex] += 1;
-			Sclass[Sindex] += 1;
+			Hindex = p[j*nChannels] / _Hbin;
+			Sindex = p[j*nChannels + 1] / _Sbin;
+			_Hclass[Hindex] += 1;
+			_Sclass[Sindex] += 1;
 		}
 }
 
-void calcIComponent(Mat &src, int &Ibin, vector<int> &Iclass)
+void calcIComponent(Mat &src, int &_Ibin, vector<int> &_Iclass)
 {
 	Mat image = src.clone();
 	cvtColor(image, image, CV_HSV2BGR);
 
 	//I取值范围（-1.192, 1.192）*256，记为306
-	Iclass.clear();
-	Iclass.resize(306 / Ibin);
-	fill(Iclass.begin(), Iclass.end(), 0);
+	_Iclass.clear();
+	_Iclass.resize(306 / _Ibin);
+	fill(_Iclass.begin(), _Iclass.end(), 0);
 
 	int nChannels = image.channels();
 	int nRows = image.rows;
@@ -79,12 +86,12 @@ void calcIComponent(Mat &src, int &Ibin, vector<int> &Iclass)
 			Y = 0.299*r + 0.587*g + 0.114*b;
 			I = 0.596*r - 0.275*g - 0.321*b + 153;		//I取值为-153~153，需将其转换为正数
 			Q = 0.212*r - 0.523*g + 0.311*b;
-			Iindex = I / Ibin;
-			Iclass[Iindex] += 1;
+			Iindex = I / _Ibin;
+			_Iclass[Iindex] += 1;
 		}
 }
 
-void saveData(int &Hbin, vector<int>&Hclass, const string &filename = "")
+void saveData(int &_Hbin, vector<int>&_Hclass, const string &filename = "")
 {
 	ofstream result;
 	string path = "";
@@ -96,31 +103,31 @@ void saveData(int &Hbin, vector<int>&Hclass, const string &filename = "")
 	result.open(path, ios::out | ios::ate);
 	time_t nowtime;
 	nowtime = time(NULL);
-	for (int i = 0; i < Hclass.size(); i++)
+	for (int i = 0; i < _Hclass.size(); i++)
 	{
-		result << Hbin * i << " " << Hclass[i] << endl;
+		result << _Hbin * i << " " << _Hclass[i] << endl;
 	}
 }
 
-void drawData(int &Hbin, vector<int> &Hclass, const string &filename = "")
+void drawData(int &_Hbin, vector<int> &_Hclass, const string &filename = "")
 {
 	//绘制的图像高,宽,单格宽
 	int height = 400;
 	double hratio = 0.8;		//最高者只能占总高的比例
 	//int width = 400;
-	//int w_bin = round(width / Hclass.size());
+	//int w_bin = round(width / _Hclass.size());
 	int w_bin = 2;
-	int width = w_bin*Hclass.size();
+	int width = w_bin*_Hclass.size();
 	Mat image(height, width, CV_8UC3);
 	
-	int maxheight = *max_element(Hclass.begin(), Hclass.end());
-	for (int i = 0; i < Hclass.size(); i++)
+	int maxheight = *max_element(_Hclass.begin(), _Hclass.end());
+	for (int i = 0; i < _Hclass.size(); i++)
 	{
-		int tmpheight = round(Hclass[i] * (height*hratio) / maxheight);
+		int tmpheight = round(_Hclass[i] * (height*hratio) / maxheight);
 		circle(image, Point(w_bin*(i + 1), height - tmpheight), 2, RED, -1);
 		if (i != 0)
 		{
-			int pretmpheight = round(Hclass[i - 1] * (height*hratio) / maxheight);
+			int pretmpheight = round(_Hclass[i - 1] * (height*hratio) / maxheight);
 			line(image, Point(w_bin*(i + 1), height - tmpheight), Point(w_bin*i, height - pretmpheight), RED, 1);
 		}
 			
@@ -133,28 +140,54 @@ void drawData(int &Hbin, vector<int> &Hclass, const string &filename = "")
 	imshow(path, image);
 }
 
-
+void getTrainingData(Mat &image, Mat &trainingData)			//image为HSV图像
+{
+	int nRows = image.rows;
+	int nCols = image.cols;
+	trainingData = Mat(image.rows, image.cols, CV_8UC2);
+	int imageChannels = image.channels();
+	int trainChannels = trainingData.channels();
+	if (image.isContinuous())
+	{
+		nCols *= nRows;
+		nRows = 1;
+	}
+	Mat bgrimage = Mat(image.size(), CV_8UC3);
+	cvtColor(image, bgrimage, CV_HSV2BGR);
+	uchar *pimage;			//原图像的行指针
+	uchar *pbgrimage;		//转换为BGR图像的行指针
+	uchar *ptrain;			//
+	int b, g, r;
+	for (int i = 0; i < nRows; i++)
+		for (int j = 0; j < nCols; j++)
+		{
+			pimage = image.ptr<uchar>(i);
+			pbgrimage = bgrimage.ptr<uchar>(i);
+			ptrain = trainingData.ptr<uchar>(i);
+			b = pbgrimage[j*imageChannels];
+			g = pbgrimage[j*imageChannels + 1];
+			r = pbgrimage[j*imageChannels + 2];
+			ptrain[j*trainChannels] = pimage[j*imageChannels] / Hbin;
+			//ptrain[j*trainChannels + 1] = pimage[j*imageChannels + 1] / Sbin;
+			ptrain[j*trainChannels + 1] = 0.596*r - 0.275*g - 0.321*b;
+		}
+}
 
 int main()
 {
 	Mat src = imread("2.bmp");
 	Mat back = imread("2.bmp");
 	cvtColor(src, src, CV_BGR2HSV);
-	int Hbin = 1;
-	int Sbin = 1;
-	int Ibin = 1;
-	vector<int> Hclass;
-	vector<int> Sclass;
-	vector<int> Iclass;
+
 	calcHSComponent(src, Hbin, Sbin, Hclass, Sclass);
 	calcIComponent(src, Ibin, Iclass);
-	saveData(Hbin, Hclass, "Hclass.txt");
-	saveData(Sbin, Sclass, "Sclass.txt");
-	saveData(Ibin, Iclass, "Iclass.txt");
+	saveData(Hbin, Hclass, "Bayesion/Hclass.txt");
+	saveData(Sbin, Sclass, "Bayesion/Sclass.txt");
+	saveData(Ibin, Iclass, "Bayesion/Iclass.txt");
 
-	drawData(Hbin, Hclass, "Hclass.txt");
-	drawData(Sbin, Sclass, "Sclass.txt");
-	drawData(Ibin, Iclass, "Iclass.txt");
+	drawData(Hbin, Hclass, "Bayesion/Hclass.txt");
+	drawData(Sbin, Sclass, "Bayesion/Sclass.txt");
+	drawData(Ibin, Iclass, "Bayesion/Iclass.txt");
 	waitKey(0);
 	return 0;
 }
