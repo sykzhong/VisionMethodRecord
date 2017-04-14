@@ -8,7 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <easylogging++.h>
-#define TEST2
+#define TEST1
 INITIALIZE_EASYLOGGINGPP
 using namespace cv;
 using namespace std;
@@ -171,13 +171,15 @@ void drawData(int &_Hbin, vector<int> &_Hclass, const string &filename = "")
 	imshow(path, image);
 }
 
+/**************************************************************************************************************/
+
 /*将image转换为HI参数，并按(image.rows*image.cols, 2)的大小映射至trainingData中*/
 void getTrainingData(Mat &image, Mat &trainingData)	
 {
 	//image为HSV图像
 	int nRows = image.rows;
 	int nCols = image.cols;
-	trainingData = Mat(image.rows*image.cols, 2, CV_32FC1);
+	trainingData = Mat(image.rows*image.cols, 4, CV_32FC1);
 	int nChannels = image.channels();
 	if (image.isContinuous())
 	{
@@ -200,7 +202,9 @@ void getTrainingData(Mat &image, Mat &trainingData)
 			r = pbgrimage[j*nChannels + 2];
 
 			trainingData.at<float>(i*nCols + j, 0) = (float)pimage[j*nChannels] / Hbin;
-			trainingData.at<float>(i*nCols + j, 1) = 0.596*r - 0.275*g - 0.321*b;
+			trainingData.at<float>(i*nCols + j, 1) = (float)pimage[j*nChannels + 1] / Sbin;
+			trainingData.at<float>(i*nCols + j, 2) = (float)pimage[j*nChannels + 2] / Vbin;
+			trainingData.at<float>(i*nCols + j, 3) = 0.596*r - 0.275*g - 0.321*b;
 
 			//ptrain = trainingData.ptr<uchar>(i);
 			//ptrain[j*trainChannels] = pimage[j*imageChannels] / Hbin;
@@ -234,27 +238,6 @@ void getResponseData(Mat &mask, Mat &responseData)
 		}
 }
 
-//class NormalBayesClassifier;
-
-void getMask(Mat &src)
-{
-	int nRows = src.rows;
-	int nCols = src.cols;
-	int nChannels = src.channels();
-	if (src.isContinuous())
-	{
-		nCols *= nRows;
-		nRows = 1;
-	}
-	float* p;
-	for (int i = 0; i < nRows; i++)
-		for (int j = 0; j < nCols; j++)
-		{
-			p = src.ptr<float>(i);
-			cout << p[j*nChannels] << endl;
-		}
-}
-
 void getTrainResult(NormalBayesClassifier *nbc, Mat &dstData, Mat &result)
 {
 	int nRows = result.rows;
@@ -265,19 +248,17 @@ void getTrainResult(NormalBayesClassifier *nbc, Mat &dstData, Mat &result)
 		nCols *= nRows;
 		nRows = 1;
 	}
-	Mat dataNode = Mat(1, 2, CV_32FC1);			//用于dstData(目标图像参数空间)的结果
-	//float *p;
+	Mat dataNode = Mat(1, 4, CV_32FC1);			//用于dstData(目标图像参数空间)的结果
 	uchar *q;
 	
 	for (int i = 0; i < nRows; i++)
 		for (int j = 0; j < nCols; j++)
 		{
-			//p = dstData.ptr<float>(i);
 			q = result.ptr<uchar>(i);
-			//dataNode.at<float>(0, 0) = p[j*nChannels];
-			//dataNode.at<float>(0, 1) = p[j*nChannels + 1];
 			dataNode.at<float>(0, 0) = dstData.at<float>(i*nCols + j, 0);
 			dataNode.at<float>(0, 1) = dstData.at<float>(i*nCols + j, 1);
+			dataNode.at<float>(0, 2) = dstData.at<float>(i*nCols + j, 2);
+			dataNode.at<float>(0, 3) = dstData.at<float>(i*nCols + j, 3);
 			//LOG(TRACE) << dataNode;
 			if (nbc->predict(dataNode) != 0)
 				q[j*nChannels] = 255;
@@ -293,35 +274,30 @@ int main()
 	LOG(TRACE) << "Begin";
 
 	Mat src = imread("2.bmp");
-	Mat s_mask = imread("2syk_1.jpg", 0);		//src mask像素不为零的区域为工件区域
+	Mat mask = imread("2syk_1.jpg", 0);		//src mask像素不为零的区域为工件区域
 	cvtColor(src, src, CV_BGR2HSV);
-	threshold(s_mask, s_mask, 254, 255, THRESH_BINARY_INV);	//Type: \n 0: Binary \n 1: Binary Inverted \n 2: Truncate \n 3: To Zero \n 4: To Zero Inverted
-	//imshow("mask", s_mask);
-	Mat trainingData;
-	Mat responseData;
-	//calcHSComponent(src, Hbin, Sbin, Hclass, Sclass);
-	//calcIComponent(src, Ibin, Iclass);
-	//saveData(Hbin, Hclass, "Bayesion/Hclass.txt");
-	//saveData(Sbin, Sclass, "Bayesion/Sclass.txt");
-	//saveData(Ibin, Iclass, "Bayesion/Iclass.txt");
+	threshold(mask, mask, 254, 255, THRESH_BINARY_INV);	//Type: \n 0: Binary \n 1: Binary Inverted \n 2: Truncate \n 3: To Zero \n 4: To Zero Inverted
+	//imshow("mask", mask);
 
-	//drawData(Hbin, Hclass, "Bayesion/Hclass.txt");
-	//drawData(Sbin, Sclass, "Bayesion/Sclass.txt");
-	//drawData(Ibin, Iclass, "Bayesion/Iclass.txt");
+	/*获取训练样本*/
+	Mat trainingData;			//训练样本
+	Mat responseData;			//训练样本
 	getTrainingData(src, trainingData);
-	getResponseData(s_mask, responseData);
+	getResponseData(mask, responseData);
 	LOG(INFO) << responseData << endl;
-	
+	/**************/
+
 	Ptr<NormalBayesClassifier> nbc = NormalBayesClassifier::create();
 	Ptr<TrainData> tData = TrainData::create(trainingData, ROW_SAMPLE, responseData);
 	nbc->train(tData);
 
-	Mat dst = imread("2.bmp");
+	Mat dst = imread("3.bmp");
 	cvtColor(dst, dst, CV_BGR2HSV);
+
 	Mat dstData;
 	getTrainingData(dst, dstData);
-	Mat result = Mat(dst.size(), CV_8UC1);
 
+	Mat result = Mat(dst.size(), CV_8UC1);
 	getTrainResult(nbc, dstData, result);
 	imshow("result", result);
 
