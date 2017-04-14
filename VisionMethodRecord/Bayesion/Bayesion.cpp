@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <easylogging++.h>
+#define TEST2
 INITIALIZE_EASYLOGGINGPP
 using namespace cv;
 using namespace std;
@@ -24,20 +25,29 @@ static const Scalar WHITE = Scalar(255, 255, 255);
 
 int Hbin = 1;
 int Sbin = 1;
+int Vbin = 1;
 int Ibin = 1;
 vector<int> Hclass;
 vector<int> Sclass;
+vector<int> Vclass;
 vector<int> Iclass;
 
-void calcHSComponent(Mat &image, int &_Hbin, int &_Sbin, vector<int> &_Hclass, vector<int> &_Sclass)
+void calcHSVComponent(Mat &image, Mat &mask = Mat())
 {
-	_Hclass.clear();
-	_Hclass.resize(180 / _Hbin);
-	fill(_Hclass.begin(), _Hclass.end(), 0);
+	if (!mask.data || mask.size() != image.size())
+		mask = Mat(image.size(), CV_8UC1, Scalar::all(255));
 
-	_Sclass.clear();
-	_Sclass.resize(256 / _Sbin);
-	fill(_Sclass.begin(), _Sclass.end(), 0);
+	Hclass.clear();
+	Hclass.resize(180 / Hbin);
+	fill(Hclass.begin(), Hclass.end(), 0);
+
+	Sclass.clear();
+	Sclass.resize(256 / Sbin);
+	fill(Sclass.begin(), Sclass.end(), 0);
+
+	Vclass.clear();
+	Vclass.resize(256 / Vbin);
+	fill(Vclass.begin(), Vclass.end(), 0);
 
 	int nChannels = image.channels();
 	int nRows = image.rows;
@@ -47,29 +57,39 @@ void calcHSComponent(Mat &image, int &_Hbin, int &_Sbin, vector<int> &_Hclass, v
 		nCols *= nRows;
 		nRows = 1;
 	}
-	uchar *p;
+	uchar *p;		//image的行指针
+	uchar *q;		//mask的行指针
 	int Hindex = 0;
 	int Sindex = 0;
-	for(int i = 0; i < nRows; i++)
+	int Vindex = 0;
+	for (int i = 0; i < nRows; i++)
 		for (int j = 0; j < nCols; j++)
 		{
+			q = mask.ptr<uchar>(i);
+			if (q[j] == 0)		//根据掩码进行像素处理选择
+				continue;
 			p = image.ptr<uchar>(i);
-			Hindex = p[j*nChannels] / _Hbin;
-			Sindex = p[j*nChannels + 1] / _Sbin;
-			_Hclass[Hindex] += 1;
-			_Sclass[Sindex] += 1;
+			Hindex = p[j*nChannels] / Hbin;
+			Sindex = p[j*nChannels + 1] / Sbin;
+			Vindex = p[j*nChannels + 2] / Vbin;
+			Hclass[Hindex] += 1;
+			Sclass[Sindex] += 1;
+			Vclass[Vindex] += 1;
 		}
 }
 
-void calcIComponent(Mat &src, int &_Ibin, vector<int> &_Iclass)
+void calcIComponent(Mat &src, Mat& mask = Mat())
 {
+	if (!mask.data || mask.size() != src.size())
+		mask = Mat(src.size(), CV_8UC1, Scalar::all(255));
+
 	Mat image = src.clone();
 	cvtColor(image, image, CV_HSV2BGR);
 
 	//I取值范围（-1.192, 1.192）*256，记为306
-	_Iclass.clear();
-	_Iclass.resize(306 / _Ibin);
-	fill(_Iclass.begin(), _Iclass.end(), 0);
+	Iclass.clear();
+	Iclass.resize(306 / Ibin);
+	fill(Iclass.begin(), Iclass.end(), 0);
 
 	int nChannels = image.channels();
 	int nRows = image.rows;
@@ -80,12 +100,16 @@ void calcIComponent(Mat &src, int &_Ibin, vector<int> &_Iclass)
 		nRows = 1;
 	}
 	uchar *p;
+	uchar *q;
 	uchar r, g, b;
 	double Y, I, Q;
 	int Iindex = 0;
 	for (int i = 0; i < nRows; i++)
 		for (int j = 0; j < nCols; j++)
 		{
+			q = mask.ptr<uchar>(i);
+			if (q[j] == 0)		//根据掩码进行像素处理选择
+				continue;
 			p = image.ptr<uchar>(i);
 			b = p[j*nChannels];
 			g = p[j*nChannels + 1];
@@ -93,8 +117,8 @@ void calcIComponent(Mat &src, int &_Ibin, vector<int> &_Iclass)
 			Y = 0.299*r + 0.587*g + 0.114*b;
 			I = 0.596*r - 0.275*g - 0.321*b + 153;		//I取值为-153~153，需将其转换为正数
 			Q = 0.212*r - 0.523*g + 0.311*b;
-			Iindex = I / _Ibin;
-			_Iclass[Iindex] += 1;
+			Iindex = I / Ibin;
+			Iclass[Iindex] += 1;
 		}
 }
 
@@ -147,8 +171,10 @@ void drawData(int &_Hbin, vector<int> &_Hclass, const string &filename = "")
 	imshow(path, image);
 }
 
-void getTrainingData(Mat &image, Mat &trainingData)			//image为HSV图像
+/*将image转换为HI参数，并按(image.rows*image.cols, 2)的大小映射至trainingData中*/
+void getTrainingData(Mat &image, Mat &trainingData)	
 {
+	//image为HSV图像
 	int nRows = image.rows;
 	int nCols = image.cols;
 	trainingData = Mat(image.rows*image.cols, 2, CV_32FC1);
@@ -259,7 +285,7 @@ void getTrainResult(NormalBayesClassifier *nbc, Mat &dstData, Mat &result)
 				q[j*nChannels] = 0;
 		}
 }
-
+#ifdef TEST1
 int main()
 {
 	Configurations conf("my-conf.conf");
@@ -270,7 +296,7 @@ int main()
 	Mat s_mask = imread("2syk_1.jpg", 0);		//src mask像素不为零的区域为工件区域
 	cvtColor(src, src, CV_BGR2HSV);
 	threshold(s_mask, s_mask, 254, 255, THRESH_BINARY_INV);	//Type: \n 0: Binary \n 1: Binary Inverted \n 2: Truncate \n 3: To Zero \n 4: To Zero Inverted
-	imshow("mask", s_mask);
+	//imshow("mask", s_mask);
 	Mat trainingData;
 	Mat responseData;
 	//calcHSComponent(src, Hbin, Sbin, Hclass, Sclass);
@@ -302,3 +328,29 @@ int main()
 	waitKey(0);
 	return 0;
 }
+#elif defined TEST2		//用于显示不同参数的对比
+int main()
+{
+	Mat src = imread("2.bmp");
+	Mat mask = imread("2syk_1.jpg", 0);		//src mask像素不为零的区域为工件区域
+	Mat fmask;			//前景掩码
+	Mat bmask;			//背景掩码
+	cvtColor(src, src, CV_BGR2HSV);
+	threshold(mask, fmask, 254, 255, THRESH_BINARY_INV);	//Type: \n 0: Binary \n 1: Binary Inverted \n 2: Truncate \n 3: To Zero \n 4: To Zero Inverted
+	threshold(mask, bmask, 254, 255, THRESH_BINARY);	//Type: \n 0: Binary \n 1: Binary Inverted \n 2: Truncate \n 3: To Zero \n 4: To Zero Inverted
+
+	//imshow("fmask", fmask);
+	imshow("bmask", bmask);
+
+	calcIComponent(src, bmask);
+	calcHSVComponent(src, bmask);
+
+	drawData(Hbin, Hclass, "Bayesion/Hclass.txt");
+	drawData(Sbin, Sclass, "Bayesion/Sclass.txt");
+	drawData(Vbin, Vclass, "Bayesion/Vclass.txt");
+	drawData(Ibin, Iclass, "Bayesion/Iclass.txt");
+
+	waitKey(0);
+	return 0;
+}
+#endif
