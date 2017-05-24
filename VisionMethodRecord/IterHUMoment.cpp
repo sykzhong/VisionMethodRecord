@@ -2,7 +2,11 @@
 //阈值迭代+轮廓矩求解中心
 
 #include "stdafx.h"
-#include "ContourExtraction.h"
+//#include "ContourExtraction.h"
+#include "opencv2/imgproc/imgproc.hpp"
+#include "opencv2/highgui/highgui.hpp"
+using namespace std;
+using namespace cv;
 
 const Scalar RED = Scalar(0, 0, 255);
 const Scalar PINK = Scalar(230, 130, 255);

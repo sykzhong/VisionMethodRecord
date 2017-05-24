@@ -266,7 +266,7 @@ void getTrainResult(NormalBayesClassifier *nbc, Mat &dstData, Mat &result)
 				q[j*nChannels] = 0;
 		}
 }
-#ifdef TEST1
+#ifdef TEST1				//单张图的训练
 int main()
 {
 	Configurations conf("my-conf.conf");
@@ -274,7 +274,9 @@ int main()
 	LOG(TRACE) << "Begin";
 
 	Mat src = imread("2.bmp");
-	Mat mask = imread("2syk_1.jpg", 0);		//src mask像素不为零的区域为工件区域
+	Mat mask = imread("2syk.jpg", 0);		//src mask像素不为零的区域为工件区域
+	//Mat src = imread("23.jpg");
+	//Mat mask = imread("23syk.jpg", 0);		//src mask像素不为零的区域为工件区域
 	cvtColor(src, src, CV_BGR2HSV);
 	threshold(mask, mask, 254, 255, THRESH_BINARY_INV);	//Type: \n 0: Binary \n 1: Binary Inverted \n 2: Truncate \n 3: To Zero \n 4: To Zero Inverted
 	//imshow("mask", mask);
@@ -284,14 +286,14 @@ int main()
 	Mat responseData;			//训练样本
 	getTrainingData(src, trainingData);
 	getResponseData(mask, responseData);
-	LOG(INFO) << responseData << endl;
+	//LOG(INFO) << responseData << endl;
 	/**************/
 
 	Ptr<NormalBayesClassifier> nbc = NormalBayesClassifier::create();
 	Ptr<TrainData> tData = TrainData::create(trainingData, ROW_SAMPLE, responseData);
 	nbc->train(tData);
 
-	Mat dst = imread("3.bmp");
+	Mat dst = imread("4.bmp");
 	cvtColor(dst, dst, CV_BGR2HSV);
 
 	Mat dstData;
@@ -300,6 +302,8 @@ int main()
 	Mat result = Mat(dst.size(), CV_8UC1);
 	getTrainResult(nbc, dstData, result);
 	imshow("result", result);
+	//imwrite("Bayesion/23result.jpg", result);
+	imwrite("Bayesion/2result.jpg", result);
 
 	waitKey(0);
 	return 0;
@@ -325,6 +329,56 @@ int main()
 	drawData(Sbin, Sclass, "Bayesion/Sclass.txt");
 	drawData(Vbin, Vclass, "Bayesion/Vclass.txt");
 	drawData(Ibin, Iclass, "Bayesion/Iclass.txt");
+
+	waitKey(0);
+	return 0;
+}
+#elif defined TEST3
+int main()
+{
+	Configurations conf("my-conf.conf");
+	Loggers::reconfigureLogger("default", conf);
+	LOG(TRACE) << "Begin";
+
+	Mat src = imread("3.bmp");
+	Mat mask = imread("3syk.jpg", 0);		//src mask像素不为零的区域为工件区域
+	Mat src1 = imread("2.bmp");
+	Mat mask1 = imread("2syk.jpg", 0);
+	cvtColor(src, src, CV_BGR2HSV);
+	threshold(mask, mask, 254, 255, THRESH_BINARY_INV);	//Type: \n 0: Binary \n 1: Binary Inverted \n 2: Truncate \n 3: To Zero \n 4: To Zero Inverted
+	//imshow("mask", mask);
+	cvtColor(src1, src1, CV_BGR2HSV);
+	threshold(mask1, mask1, 254, 255, THRESH_BINARY_INV);	//Type: \n 0: Binary \n 1: Binary Inverted \n 2: Truncate \n 3: To Zero \n 4: To Zero Inverted
+
+	Ptr<NormalBayesClassifier> nbc = NormalBayesClassifier::create();
+
+	/*获取训练样本*/
+	Mat trainingData;			//训练样本
+	Mat responseData;			//训练样本
+	getTrainingData(src, trainingData);
+	getResponseData(mask, responseData);
+	//LOG(INFO) << responseData << endl;
+	/**************/
+	Ptr<TrainData> tData = TrainData::create(trainingData, ROW_SAMPLE, responseData);
+	nbc->train(tData);
+
+	/*第二次训练*/
+	getTrainingData(src1, trainingData);
+	getResponseData(mask1, responseData);
+	//LOG(INFO) << responseData << endl;
+	tData = TrainData::create(trainingData, ROW_SAMPLE, responseData);
+	nbc->train(tData);
+
+
+	Mat dst = imread("4.bmp");
+	cvtColor(dst, dst, CV_BGR2HSV);
+
+	Mat dstData;
+	getTrainingData(dst, dstData);
+
+	Mat result = Mat(dst.size(), CV_8UC1);
+	getTrainResult(nbc, dstData, result);
+	imshow("result", result);
 
 	waitKey(0);
 	return 0;
