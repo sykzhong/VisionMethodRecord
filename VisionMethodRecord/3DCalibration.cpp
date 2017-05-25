@@ -40,17 +40,12 @@ int main()
 	float max_dist = matches.back().distance, min_dist = matches.front().distance;
 	vector< DMatch > good_matches;
 
-	//int ptsPairs = std::min(50, (int)(matches.size() * 0.15));
-	//cout << ptsPairs << endl;
-	//for (int i = 0; i < ptsPairs; i++)
-	//{
-	//	good_matches.push_back(matches[i]);
-	//}
+	//完成surf匹配，使用ratio test首次去除误匹配点
 
 	for (int i = 0; i < matches.size(); i++)
 	{
 		//if (matches[i].distance < 0.3*max_dist)
-		if(matches[i].distance < 0.6*max_dist)
+		if (matches[i].distance < 0.6*max_dist)
 			good_matches.push_back(matches[i]);
 		//if (good_matches.size() >= 200)
 		//	break;
@@ -100,18 +95,22 @@ int main()
 	Mat p2(ptCount, 2, CV_32F);
 	for (int i = 0; i < ptCount; i++)
 	{
-		pt = key1[m_Matches[i].queryIdx].pt;
+		/*pt = key1[m_Matches[i].queryIdx].pt;
 		p1.at<float>(i, 0) = pt.x;
-		p1.at<float>(i, 1) = pt.y;
+		p1.at<float>(i, 1) = pt.y;*/
+		p1.at<float>(i, 0) = obj[i].x;
+		p1.at<float>(i, 1) = obj[i].y;
 
-		pt = key2[m_Matches[i].trainIdx].pt;
+		/*pt = key2[m_Matches[i].trainIdx].pt;
 		p2.at<float>(i, 0) = pt.x;
-		p2.at<float>(i, 1) = pt.y;
+		p2.at<float>(i, 1) = pt.y;*/
+		p2.at<float>(i, 0) = scene[i].x;
+		p2.at<float>(i, 1) = scene[i].y;
 	}
-	//用RANSAC方法计算基础矩阵F
+	//用RANSAC方法计算本征矩阵
 	Mat m_Fundamental;
 	vector<uchar> m_RANSACStatus;
-	findFundamentalMat(p1, p2, m_RANSACStatus, FM_RANSAC);
+	findFundamentalMat(obj, scene, m_RANSACStatus, FM_RANSAC);
 
 	//计算野点个数
 	int OutLinerCount = 0;
@@ -146,12 +145,12 @@ int main()
 			m_RightInlier[InlinerCount].y = p2.at<float>(i, 1);
 			m_InlierMatches[InlinerCount].queryIdx = InlinerCount;
 			m_InlierMatches[InlinerCount].trainIdx = InlinerCount;
-			if (m_RightInlier[InlinerCount].x<inlier_minRx) 
+			if (m_RightInlier[InlinerCount].x<inlier_minRx)
 				inlier_minRx = m_RightInlier[InlinerCount].x;   //存储内点中右图最小横坐标   
 			InlinerCount++;
 		}
 	}
-	
+
 	// 把内点转换为drawMatches可以使用的格式   
 	vector<KeyPoint> key1_RANSAC(InlinerCount);
 	vector<KeyPoint> key2_RANSAC(InlinerCount);
