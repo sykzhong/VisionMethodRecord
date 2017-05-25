@@ -77,6 +77,7 @@ int main()
 
 	double feasible_count = countNonZero(m_RANSACStatus);
 	cout << (int)feasible_count << " -in- " << obj.size() << endl;
+
 	//对于RANSAC而言，outlier数量大于50%时，结果是不可靠的
 	//if (feasible_count <= 15 || (feasible_count / obj.size()) < 0.6)
 	//	return false;
@@ -90,6 +91,27 @@ int main()
 	if (((double)pass_count) / feasible_count < 0.7)
 		return false;
 
+	//构造obj与scene的投影矩阵
+	Mat proj1(3, 4, CV_32FC1);
+	Mat proj2(3, 4, CV_32FC1);
+
+	proj1(Range(0, 3), Range(0, 3)) = Mat::eye(3, 3, CV_32FC1); 
+	proj1.col(3) = Mat::zeros(3, 1, CV_32FC1); 
+	
+	R.convertTo(proj2(Range(0, 3), Range(0, 3)), CV_32FC1); 
+	T.convertTo(proj2.col(3), CV_32FC1);
+
+	//转换相机内参矩阵
+	Mat fK;
+	m_cameraMatrix.convertTo(fK, CV_32FC1); 
+	proj1 = fK*proj1; 
+	proj2 = fK*proj2;
+
+	//三角化重建 
+	Mat structure;		//三维重建的结果
+	triangulatePoints(proj1, proj2, obj, scene, structure);
+	imshow("3d result", structure);
+	waitKey(0);
 	return true;
 
 	//std::vector<Point2f> obj_corners(4);
