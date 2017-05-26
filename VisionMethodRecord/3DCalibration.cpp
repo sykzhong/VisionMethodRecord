@@ -91,6 +91,32 @@ int main()
 	if (((double)pass_count) / feasible_count < 0.7)
 		return false;
 
+	//显示经过RANSAC算法后的匹配点
+	vector<Point2f> tmpleftkey, tmprightkey;		//以point2f的形式存储keypoint
+	vector<KeyPoint> leftkey, rightkey;				//分别存储两幅图像经过
+	vector<DMatch> m_inMatches(pass_count);						//内点匹配对
+	int inCount = 0;		//内点数量计数
+	for (int i = 0; i < obj.size(); i++)
+	{
+		if (m_RANSACStatus.at<uchar>(i, 0) != 0)
+		{
+			tmpleftkey.push_back(obj[i]);
+			tmprightkey.push_back(scene[i]);
+			m_inMatches[inCount].queryIdx = inCount;
+			m_inMatches[inCount].trainIdx = inCount;
+			inCount++;
+		}
+	}
+	KeyPoint::convert(tmpleftkey, leftkey);
+	KeyPoint::convert(tmprightkey, rightkey);
+
+	Mat OutImage;
+	drawMatches(a, leftkey, b, rightkey, m_inMatches, OutImage);
+	namedWindow("RANSAC result2", CV_WINDOW_NORMAL);
+	imshow("RANSAC result2", OutImage);
+	waitKey(0);
+	
+
 	//构造obj与scene的投影矩阵
 	Mat proj1(3, 4, CV_32FC1);
 	Mat proj2(3, 4, CV_32FC1);
