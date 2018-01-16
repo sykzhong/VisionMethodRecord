@@ -30,10 +30,10 @@ int main(int argc, char** argv)
 	/// 载入原图像
 	src = imread("wp_000.bmp", 1);
 
-	if (display_caption("Original Image") != 0) { return 0; }
+	//if (display_caption("Original Image") != 0) { return 0; }
 
-	dst = src.clone();
-	if (display_dst(DELAY_CAPTION) != 0) { return 0; }
+	//dst = src.clone();
+	//if (display_dst(DELAY_CAPTION) != 0) { return 0; }
 
 	/// 使用 均值平滑
 	if (display_caption("Homogeneous Blur") != 0) { return 0; }

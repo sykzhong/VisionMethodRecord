@@ -35,6 +35,9 @@ int main()
 	surf->detectAndCompute(b, Mat(), key2, d);
 
 	matcher.match(c, d, matches);       //∆•≈‰  
+	//imshow("c", c);
+	//imshow("d", d);
+	//waitKey(0);
 
 	sort(matches.begin(), matches.end());  //…∏—°∆•≈‰µ„  
 	float max_dist = matches.back().distance, min_dist = matches.front().distance;
