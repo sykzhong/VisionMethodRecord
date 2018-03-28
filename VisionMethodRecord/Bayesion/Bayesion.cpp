@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
-#include <easylogging++.h>
+#include "easylogging++.h"
 #define TEST1
 INITIALIZE_EASYLOGGINGPP
 using namespace cv;
