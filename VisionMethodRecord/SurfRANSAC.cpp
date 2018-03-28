@@ -11,8 +11,8 @@
 #include "opencv2/imgproc.hpp"  
 #include"opencv2/flann.hpp"  
 #include"opencv2/xfeatures2d.hpp"  
-#include"opencv2/ml.hpp"  
-#include "opencv2/nofree.hpp"
+#include "opencv2/ml.hpp"  
+#include "opencv2/nonfree.hpp"
 
 using namespace cv;
 using namespace std;
